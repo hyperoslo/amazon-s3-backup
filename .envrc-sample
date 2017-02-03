@@ -1,0 +1,6 @@
+export AWS_ACCESS_KEY_ID=secret
+export AWS_SECRET_ACCESS_KEY=super-secret
+
+export GCS_PROJECT=project_id
+export GCS_PRIVATE_KEY=base64encoded versions of private_key
+export GCS_CLIENT_EMAIL=client_email

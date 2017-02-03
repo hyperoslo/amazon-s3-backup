@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+'use strict';
+const _ = require('lodash');
+const async = require('async');
+const moment = require('moment');
+const AWS = require('aws-sdk');
+const google = require('googleapis');
+const Storage = require('@google-cloud/storage');
+
+// Load private key from ENV
+const GCS_PRIVATE_KEY = new Buffer(process.env.GCS_PRIVATE_KEY, 'base64').toString('utf-8');
+
+// Setup Google Cloud Storage API module
+const gcs = Storage({
+  projectId: process.env.GCS_PROJECT,
+  credentials: {
+    client_email: process.env.GCS_CLIENT_EMAIL,
+    private_key: GCS_PRIVATE_KEY,
+  }
+});
+
+// Authenticate the googleapis module
+var authClient = new google.auth.JWT(
+  process.env.GCS_CLIENT_EMAIL,
+  null,
+  GCS_PRIVATE_KEY,
+  [
+    'https://www.googleapis.com/auth/cloud-platform',
+  ],
+  null
+);
+
+// Set up storagetransfer module
+const storagetransfer = google.storagetransfer('v1');
+
+function createTransferJob(bucket, callback) {
+  var startDate = moment(moment(), 'YYYY/MM/DD');
+
+  const transferJob = {
+    description: `${bucket}-daily`,
+    projectId: process.env.GCS_PROJECT,
+    transferSpec: {
+      transferOptions: {
+        deleteObjectsUniqueInSink: false,
+        deleteObjectsFromSourceAfterTransfer: false,
+      },
+      awsS3DataSource: {
+        bucketName: bucket,
+        awsAccessKey: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        }
+      },
+      gcsDataSink: {
+        bucketName: bucket,
+      },
+    },
+    schedule: {
+      scheduleStartDate: {
+        year: startDate.year(),
+        month: startDate.month() + 1,
+        day: startDate.date(),
+      },
+      startTimeOfDay: {
+        hours: 1,
+        minutes: 0,
+        seconds: 0,
+        nanos: 0,
+      },
+    },
+    status: 'ENABLED',
+  };
+
+  storagetransfer.transferJobs.create({
+    auth: authClient,
+    resource: transferJob,
+  }, (err, res) => {
+    if (err) return callback(err);
+    return callback(null, transferJob);
+  });
+}
+
+function createGCSBucket (bucketName, callback) {
+  return gcs.createBucket(bucketName, {
+    coldline: true,
+    location: 'EUROPE-WEST1',
+  }, (err, result) => {
+    if (err) return callback(err);
+
+    const bucket = result;
+    callback(null, bucket);
+  });
+}
+
+function getGCSBuckets(callback) {
+  gcs.getBuckets((err, result) => {
+    const buckets = _.map(result, 'name');
+    callback(err, buckets);
+  });
+};
+
+function getS3Buckets(callback) {
+  // Credentials loaded from ENV automatically
+  const s3 = new AWS.S3();
+  s3.listBuckets((err, data) => {
+    if (err) return next(err);
+
+    // Create a flat list of bucket names
+    const buckets = _.map(data.Buckets, 'Name');
+    callback(err, buckets);
+  });
+};
+
+function syncBuckets() {
+  let gcsBuckets;
+
+  async.waterfall([
+    (done) => {
+      authClient.authorize(done);
+    },
+
+    // Fetch a list of all GCS buckets
+    (tokens, done) => {
+      getGCSBuckets(done);
+    },
+
+    // Fetch list of all S3 buckets
+    (buckets, done) => {
+      gcsBuckets = buckets;
+
+      // Fetch a list of Amazon S3 Buckets
+      getS3Buckets(done);
+    },
+
+    // Sync buckets
+    (s3buckets, done) => {
+      // Loop through all S3 buckets, check if we already have the bucket in GCS
+      // if not, create it, and add transfer job for it.
+      async.each(s3buckets, (s3bucket, next) => {
+        // Skip if this bucket exist already
+        if (_.includes(gcsBuckets, s3bucket)) {
+          return next();
+        }
+
+        // Create new bucket
+        createGCSBucket(s3bucket, (err, bucket) => {
+          if (err) {
+            return next(err);
+          }
+
+          // Create transfer job
+          createTransferJob(s3bucket, (err, result) => {
+            return next(err);
+          })
+        });
+      }, done);
+    },
+  ], (err) => {
+    console.log('done:', err);
+    process.exit(0);
+  })
+};
+
+syncBuckets();

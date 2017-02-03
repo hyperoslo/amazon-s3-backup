@@ -1,0 +1,24 @@
+{
+  "name": "s3-backup",
+  "version": "1.0.0",
+  "description": "Utility that creates storage buckets and transfer jobs that backup Amazon S3 Buckets to Google Cloud Storage",
+  "repository": "",
+  "private": true,
+  "scripts": {
+  },
+  "author": "Espen Høgbakk <espen@hogbakk.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@google-cloud/storage": "^0.6.1",
+    "async": "^2.1.4",
+    "aws-sdk": "^2.9.0",
+    "googleapis": "^16.1.0",
+    "lodash": "^4.17.4",
+    "moment": "^2.17.1"
+  },
+  "devDependencies": {
+  },
+  "engines": {
+    "node": ">=4.3.2"
+  }
+}
