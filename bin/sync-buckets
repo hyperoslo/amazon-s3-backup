@@ -35,8 +35,20 @@ var authClient = new google.auth.JWT(
 const storagetransfer = google.storagetransfer('v1');
 
 
-function normalizeBucketName(bucketName) {
-  return _.replace(bucketName, new RegExp("\\.","g"), "_") + '-backup';
+/*
+ * Make sure the bucket names adhere to the Cloud Storage rules.
+ *
+ * * No .'s
+ * * Less than 63 characters long
+ */
+function normalizeBucketName(_bucketName) {
+  let bucketName = _bucketName;
+  const postfix = '-backup';
+  const nameLength = 63 - postfix.length;
+  bucketName = bucketName.substring(0, nameLength); // Make sure we don't use to long names
+  bucketName = _.replace(bucketName, new RegExp("\\.","g"), "_"); // Remove .'s
+  bucketName += postfix;
+  return bucketName;
 };
 
 
