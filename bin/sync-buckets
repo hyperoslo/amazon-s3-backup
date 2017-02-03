@@ -7,6 +7,7 @@ const AWS = require('aws-sdk');
 const google = require('googleapis');
 const Storage = require('@google-cloud/storage');
 
+
 // Load private key from ENV
 const GCS_PRIVATE_KEY = new Buffer(process.env.GCS_PRIVATE_KEY, 'base64').toString('utf-8');
 
@@ -33,11 +34,19 @@ var authClient = new google.auth.JWT(
 // Set up storagetransfer module
 const storagetransfer = google.storagetransfer('v1');
 
+
+function normalizeBucketName(bucketName) {
+  return _.replace(bucketName, new RegExp("\\.","g"), "_") + '-backup';
+};
+
+
 function createTransferJob(bucket, callback) {
   var startDate = moment(moment(), 'YYYY/MM/DD');
 
+  const bucketName = normalizeBucketName(bucket);
+
   const transferJob = {
-    description: `${bucket}-daily`,
+    description: `${bucketName}-daily`,
     projectId: process.env.GCS_PROJECT,
     transferSpec: {
       transferOptions: {
@@ -52,7 +61,7 @@ function createTransferJob(bucket, callback) {
         }
       },
       gcsDataSink: {
-        bucketName: bucket,
+        bucketName: bucketName,
       },
     },
     schedule: {
@@ -81,7 +90,7 @@ function createTransferJob(bucket, callback) {
 }
 
 function createGCSBucket (bucketName, callback) {
-  return gcs.createBucket(bucketName, {
+  return gcs.createBucket(normalizeBucketName(bucketName), {
     coldline: true,
     location: 'EUROPE-WEST1',
   }, (err, result) => {
@@ -136,9 +145,9 @@ function syncBuckets() {
     (s3buckets, done) => {
       // Loop through all S3 buckets, check if we already have the bucket in GCS
       // if not, create it, and add transfer job for it.
-      async.each(s3buckets, (s3bucket, next) => {
+      async.eachSeries(s3buckets, (s3bucket, next) => {
         // Skip if this bucket exist already
-        if (_.includes(gcsBuckets, s3bucket)) {
+        if (_.includes(gcsBuckets, normalizeBucketName(s3bucket))) {
           return next();
         }
 
