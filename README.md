@@ -39,11 +39,13 @@ and add it in the IAM section as an editor to your project.
 5. Enable Storage API: https://console.cloud.google.com/flows/enableapi?apiid=storage_component
 6. Make sure the following ENV variables exist (see .envrc-example)
 
+```
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 GCS_PROJECT
 GCS_PRIVATE_KEY
 GCS_CLIENT_EMAIL
+```
 
 That should be everything you need to get going.
 
