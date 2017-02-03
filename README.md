@@ -51,4 +51,4 @@ That should be everything you need to get going.
 
 ## Usage
 
-./bin/sync-buckets
+`./bin/sync-buckets`
