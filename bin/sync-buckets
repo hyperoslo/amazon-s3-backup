@@ -34,6 +34,8 @@ var authClient = new google.auth.JWT(
 // Set up storagetransfer module
 const storagetransfer = google.storagetransfer('v1');
 
+// Get blacklist of buckets we don't want to backup
+const bucketBlacklist = process.env.BUCKET_BLACKLIST ? process.env.BUCKET_BLACKLIST.split(',') : [];
 
 /*
  * Make sure the bucket names adhere to the Cloud Storage rules.
@@ -160,6 +162,11 @@ function syncBuckets() {
       async.eachSeries(s3buckets, (s3bucket, next) => {
         // Skip if this bucket exist already
         if (_.includes(gcsBuckets, normalizeBucketName(s3bucket))) {
+          return next();
+        }
+
+        // Skip if this bucket is in blacklist
+        if (_.includes(bucketBlacklist, s3Bucket)) {
           return next();
         }
 
